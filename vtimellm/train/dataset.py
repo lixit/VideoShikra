@@ -392,11 +392,13 @@ class LazySupervisedDataset(Dataset):
 
             replace_set = []
             for k, v in source['meta']['token'].items():
-                replace_set.append((k, convert(source['meta']['duration'], v)))
+                if isinstance(v, list):
+                    replace_set.append((k, str(v)))
+                else:
+                    replace_set.append((k, convert(source['meta']['duration'], v)))
             for l in range(len(source['conversations'])):
                 for x1, x2 in replace_set:
                     source['conversations'][l]['value'] = source['conversations'][l]['value'].replace(x1, x2)
-
         image = torch.zeros((100 if data_type == 'video' else 1, 768), dtype=torch.float16)
 
 
