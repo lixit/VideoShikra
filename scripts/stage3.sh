@@ -28,6 +28,9 @@ deepspeed --include localhost:$gpu_vis --master_port $MASTER_PORT vtimellm/train
     --save_strategy "steps" \
     --save_steps 100 \
     --save_total_limit 5 \
+    --load_best_model_at_end True \
+    --metric_for_best_model "eval_loss" \
+    --greater_is_better False \
     --learning_rate 1e-4 \
     --freeze_mm_mlp_adapter True \
     --lora_r 64 \
