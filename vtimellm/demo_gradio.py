@@ -3,7 +3,6 @@ Adapted from: https://github.com/Vision-CAIR/MiniGPT-4/blob/main/demo.py
 """
 import argparse
 import re
-import ast
 import cv2
 import os
 root_dir = os.path.join(os.getcwd(), "..")
@@ -239,10 +238,10 @@ with gr.Blocks() as demo:
             text_input = gr.Textbox(label='User', placeholder=TEXT_PLACEHOLDER, interactive=False)
             
 
-#    with gr.Column():
-#        gr.Examples(examples=[
-#            [os.path.join(root_dir, f"images/demo.mp4"), "Explain why the video is funny."],
-#        ], inputs=[video, text_input])
+    # with gr.Column():
+    #     gr.Examples(examples=[
+    #         [os.path.join(root_dir, f"images/demo.mp4"), "Explain why the video is funny."],
+    #     ], inputs=[video, text_input])
         
     with gr.Row():
         image1 = gr.Image(label="Image 1")

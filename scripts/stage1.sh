@@ -4,13 +4,14 @@ MODEL_VERSION=vicuna-v1-5-7b
 gpu_vis=0 # per_device_train_batch_size * gradient_accumulation_steps * n_gpus = 128
 MASTER_PORT=29570
 
+cd ..
 
 deepspeed --include localhost:$gpu_vis --master_port $MASTER_PORT vtimellm/train/train_mem.py \
     --deepspeed ./scripts/zero3.json \
-    --model_name_or_path ./checkpoints/vicuna-7b-v1.5 \
+    --model_name_or_path lmsys/vicuna-7b-v1.5 \
     --version plain \
     --data_path ./data/blip_laion_cc_sbu_558k.json \
-    --feat_folder /path/to/stage1_feat \
+    --feat_folder ./data/558k_clip_feat \
     --tune_mm_mlp_adapter True \
     --output_dir ./checkpoints/vtimellm-$MODEL_VERSION-stage1 \
     --bf16 True \
