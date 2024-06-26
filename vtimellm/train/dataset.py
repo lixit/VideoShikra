@@ -17,8 +17,11 @@ from vtimellm.mm_utils import tokenizer_image_token
 class DataArguments:
     data_path: str = field(default=None,
                            metadata={"help": "Path to the training data."})
+    val_data_path: Optional[str] = field(default=None,
+                            metadata={"help": "Path to the validation data."})
     lazy_preprocess: bool = False
     feat_folder: Optional[str] = field(default=None)
+    val_feat_folder: Optional[str] = field(default=None)
 
 def _tokenize_fn(strings: Sequence[str],
                  tokenizer: transformers.PreTrainedTokenizer) -> Dict:
@@ -363,13 +366,13 @@ class LazySupervisedDataset(Dataset):
     """Dataset for supervised fine-tuning."""
 
     def __init__(self, data_path: str,
-                 tokenizer: transformers.PreTrainedTokenizer,
-                 data_args: DataArguments):
+                 feat_folder: str,
+                 tokenizer: transformers.PreTrainedTokenizer):
         super(LazySupervisedDataset, self).__init__()
 
         self.tokenizer = tokenizer
         self.list_data_dict = json.load(open(data_path, "r"))
-        self.data_args = data_args
+        self.feat_folder = feat_folder
 
     def __len__(self):
         return len(self.list_data_dict)
@@ -403,7 +406,7 @@ class LazySupervisedDataset(Dataset):
 
 
         try:
-            feature_path = '{}/{}.npy'.format(self.data_args.feat_folder, source['id'])
+            feature_path = '{}/{}.npy'.format(self.feat_folder, source['id'])
             image = np.load(feature_path) # <N, 768> float16
             image = torch.from_numpy(image)
             if data_type == 'image' and len(image.shape) == 1: # <768>
@@ -464,11 +467,14 @@ class DataCollatorForSupervisedDataset(object):
 def make_supervised_data_module(tokenizer: transformers.PreTrainedTokenizer,
                                 data_args: DataArguments) -> Dict:
     """Make dataset and collator for supervised fine-tuning."""
-    train_dataset = LazySupervisedDataset(tokenizer=tokenizer,
-                                data_path=data_args.data_path,
-                                data_args=data_args)
+    train_dataset = LazySupervisedDataset(data_path=data_args.data_path,
+                                          feat_folder=data_args.feat_folder,
+                                          tokenizer=tokenizer)
+    eval_dataset = LazySupervisedDataset(data_path=data_args.val_data_path,
+                                        feat_folder=data_args.val_feat_folder,
+                                        tokenizer=tokenizer) if data_args.val_data_path else None
     data_collator = DataCollatorForSupervisedDataset(tokenizer=tokenizer)
     return dict(train_dataset=train_dataset,
-                eval_dataset=None,
+                eval_dataset=eval_dataset,
                 data_collator=data_collator)
 
