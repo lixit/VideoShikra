@@ -138,7 +138,7 @@ def main():
             if begin_frame != record['meta']['token']['<s0>']:
                 begin_frame_correct = False
                 average_begin_frame_wrong += 1
-            if end_frame != record['meta']['token']['<e1>']:
+            if end_frame != record['meta']['token']['<e0>']:
                 end_frame_correct = False
                 average_end_frame_wrong += 1
             begin_iou = iou_bbox(record['meta']['token']['<b0>'], begin_bbox)
