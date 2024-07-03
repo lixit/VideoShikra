@@ -12,15 +12,15 @@ deepspeed --include localhost:$gpu_vis --master_port $MASTER_PORT vtimellm/train
     --training_stage 3 \
     --model_name_or_path lmsys/vicuna-7b-v1.5 \
     --version v1 \
-    --data_path ./data/xl/train/results_train.json \
-    --feat_folder ./data/xl/train/stage4_features  \
-    --val_data_path ./data/xl/val/results_val.json \
-    --val_feat_folder ./data/xl/val/stage4_features_val \
+    --data_path ./data/xl/vidstg_train.json \
+    --feat_folder ./data/xl/stage4_features  \
+    --val_data_path ./data/xl/vidstg_val.json \
+    --val_feat_folder ./data/xl/stage4_features \
     --pretrain_mm_mlp_adapter ./checkpoints/vtimellm-$MODEL_VERSION-stage1/mm_projector.bin \
     --stage2_path ./checkpoints/vtimellm-$MODEL_VERSION-stage2 \
-    --output_dir ./checkpoints/vtimellm-$MODEL_VERSION-stage3_xl_300_epoch \
+    --output_dir ./checkpoints/vtimellm-$MODEL_VERSION-stage3_all_bbox \
     --bf16 True \
-    --num_train_epochs 300 \
+    --num_train_epochs 100 \
     --per_device_train_batch_size 8 \
     --gradient_accumulation_steps 16 \
     --evaluation_strategy "steps" \
