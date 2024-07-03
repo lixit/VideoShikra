@@ -385,23 +385,23 @@ class LazySupervisedDataset(Dataset):
             source['conversations'][0]['value'] = source['conversations'][0]['value'].replace('<image>', '<video>')
             data_type = 'image'
 
-        if 'meta' in source:
-            def convert(duration, x):
-                x = x / duration * 100
-                x = str(min(round(x), 99))
-                if len(x) == 1:
-                    x = "0" + x
-                return x
+        # if 'meta' in source:
+        #     def convert(duration, x):
+        #         x = x / duration * 100
+        #         x = str(min(round(x), 99))
+        #         if len(x) == 1:
+        #             x = "0" + x
+        #         return x
 
-            replace_set = []
-            for k, v in source['meta']['token'].items():
-                if isinstance(v, list):
-                    replace_set.append((k, str(v)))
-                else:
-                    replace_set.append((k, convert(source['meta']['duration'], v)))
-            for l in range(len(source['conversations'])):
-                for x1, x2 in replace_set:
-                    source['conversations'][l]['value'] = source['conversations'][l]['value'].replace(x1, x2)
+        #     replace_set = []
+        #     for k, v in source['meta']['token'].items():
+        #         if isinstance(v, list):
+        #             replace_set.append((k, str(v)))
+        #         else:
+        #             replace_set.append((k, convert(source['meta']['duration'], v)))
+        #     for l in range(len(source['conversations'])):
+        #         for x1, x2 in replace_set:
+        #             source['conversations'][l]['value'] = source['conversations'][l]['value'].replace(x1, x2)
         image = torch.zeros((100 if data_type == 'video' else 1, 768), dtype=torch.float16)
 
 
