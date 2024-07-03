@@ -32,7 +32,8 @@ deepspeed --include localhost:$gpu_vis --master_port $MASTER_PORT vtimellm/train
     --metric_for_best_model "eval_loss" \
     --greater_is_better False \
     --learning_rate 1e-4 \
-    --freeze_mm_mlp_adapter True \
+    --tune_mm_mlp_adapter True \
+    --freeze_mm_mlp_adapter False \
     --lora_r 64 \
     --lora_alpha 128 \
     --weight_decay 0. \
