@@ -197,7 +197,7 @@ def display_images(video_path, chat_state, N=100):
         frames_in_memory.append(frame)
         
     output_filename = 'output_video.mp4'
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec
+    fourcc = cv2.VideoWriter_fourcc(*'H264')  # Codec
     frame_size = (width, height)  # Frame size, adjust to your needs
     video_writer = cv2.VideoWriter(output_filename, fourcc, fps, frame_size)
     
