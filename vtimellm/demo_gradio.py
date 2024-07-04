@@ -97,7 +97,7 @@ def upload_video(gr_video, chat_state, video_features_state, conv_state, chatbot
         images = transform(images / 255.0)
         images = images.to(torch.float16)
         with torch.no_grad():
-            video_features_state = clip_model.encode_image(images.to('cuda'))
+            video_features_state = clip_model.encode_image(images.to(device))
 
         chatbot = chatbot + [((gr_video,), None)]
         chat_state = conv_templates["v1"].copy()
@@ -153,64 +153,61 @@ def gradio_answer(chatbot, chat_state, video_features_state, conv_state, tempera
     return chatbot, chat_state
 
 def extract_frame_and_position(output: str):
-    frame_pattern = re.compile(r'frame (\d+)')
-    bbox_pattern = re.compile(r'\[(\d+\.\d+), (\d+\.\d+), (\d+\.\d+), (\d+\.\d+)\]')
+    pattern = re.compile(r'(\d+):\[(\d+),(\d+),(\d+),(\d+)\]')
+    matches = pattern.findall(output)
     
-    frame = frame_pattern.findall(output)
-    bbox = bbox_pattern.findall(output)
-    
-    frame = [int(f) for f in frame]
-    bbox = [[float(b) for b in box] for box in bbox]
-    
-    return list(zip(frame, bbox))
+    frame_to_bbox = {}
+    # Loop through matches to populate the dictionary
+    for match in matches:
+        frame_number = int(match[0])
+        bbox = [int(coord) for coord in match[1:]]
+        frame_to_bbox[frame_number] = bbox
+
+    return frame_to_bbox
+
 
 def display_images(video_path, chat_state, N=100):
-    
     answer = chat_state.messages[-1][-1]
-    
-    results = extract_frame_and_position(answer)
-    
-    frame0 = results[0][0]
-    bbox0 = results[0][1]
-    frame1 = results[1][0]
-    bbox1 = results[1][1]
+    frame_to_bbox = extract_frame_and_position(answer)
 
     cap = cv2.VideoCapture(video_path)
     total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
-    real_frame0 = int(frame0 * total_frames / N)
-    real_frame1 = int(frame1 * total_frames / N)
-    
-    cap.set(cv2.CAP_PROP_POS_FRAMES, real_frame0)
-    
-    ret, frame1 = cap.read()
-    if ret:
-        height, width = frame1.shape[:2]
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    frames_in_memory = []
+    while True:
+        curr_frame = int(cap.get(cv2.CAP_PROP_POS_FRAMES))
         
-        xmin = int(bbox0[0] * width)
-        ymin = int(bbox0[1] * height)
-        xmax = int(bbox0[2] * width)
-        ymax = int(bbox0[3] * height)
+        ret, frame = cap.read()
         
-        cv2.rectangle(frame1, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
-        frame1 = cv2.cvtColor(frame1, cv2.COLOR_BGR2RGB)
+        if not ret:
+            break  # Break the loop if there are no frames left to read
+        
+        # Process the frame (example: convert to RGB)
+        imagine_frame = round(curr_frame / total_frames * 100, 0)
+        if imagine_frame in list(frame_to_bbox.keys()):
+            
+            bbox = frame_to_bbox[imagine_frame]
+            height, width = frame.shape[:2]
+            xmin = int(bbox[0] * width / 100)
+            ymin = int(bbox[1] * height / 100)
+            xmax = int(bbox[2] * width / 100)
+            ymax = int(bbox[3] * height / 100)
+            frame = cv2.rectangle(frame, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
+        
+        frames_in_memory.append(frame)
+        
+    output_filename = 'output_video.mp4'
+    fourcc = cv2.VideoWriter_fourcc(*'mp4v')  # Codec
+    frame_size = (width, height)  # Frame size, adjust to your needs
+    video_writer = cv2.VideoWriter(output_filename, fourcc, fps, frame_size)
+    
+    for frame in frames_in_memory:
+        video_writer.write(frame)
+        
+    video_writer.release()
+    return output_filename
 
-        
-    cap.set(cv2.CAP_PROP_POS_FRAMES, real_frame1)
-    ret, frame2 = cap.read()
-    if ret:
-        height, width = frame2.shape[:2]
-        
-        xmin = int(bbox1[0] * width)
-        ymin = int(bbox1[1] * height)
-        xmax = int(bbox1[2] * width)
-        ymax = int(bbox1[3] * height)
-        
-        cv2.rectangle(frame2, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
-        frame2 = cv2.cvtColor(frame2, cv2.COLOR_BGR2RGB)
-        
-    cap.release()
-    
-    return frame1, frame2
+
 
 with gr.Blocks() as demo:
     gr.Markdown('''# Demo for VTimeLLM''')
@@ -243,9 +240,8 @@ with gr.Blocks() as demo:
     #         [os.path.join(root_dir, f"images/demo.mp4"), "Explain why the video is funny."],
     #     ], inputs=[video, text_input])
         
-    with gr.Row():
-        image1 = gr.Image(label="Image 1")
-        image2 = gr.Image(label="Image 2")
+    with gr.Column():
+        video1 = gr.Video()
         
     upload_button.click(upload_video, [video, chat_state, video_features_state, conv_state, chatbot],
                         [video, text_input, upload_button, chat_state, video_features_state, conv_state, chatbot])
@@ -254,7 +250,7 @@ with gr.Blocks() as demo:
                           .then(gradio_answer, 
                                 [chatbot, chat_state, video_features_state, conv_state, temperature], 
                                 [chatbot, chat_state])\
-                            .then(display_images, [video, chat_state], [image1, image2])
+                            .then(display_images, [video, chat_state], [video1])
     clear.click(gradio_reset, [chat_state, video_features_state, conv_state], 
                 [chatbot, video, text_input, upload_button, chat_state, video_features_state, conv_state], queue=False)
 

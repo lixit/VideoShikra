@@ -410,7 +410,7 @@ class LazySupervisedDataset(Dataset):
             image = np.load(feature_path) # <N, 768> float16
             image = torch.from_numpy(image)
             if data_type == 'image' and len(image.shape) == 1: # <768>
-                image = image.unsqueeze(0)
+                image = image.unsqueeze(0) # torch.Size([1, 768])
         except Exception as e:
             print(e)
             return random.choice(self)
