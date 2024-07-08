@@ -61,16 +61,17 @@ def iou_bbox(gt: list, pred: list):
     return intersection / union
 
 def extract_frame_and_position(output: str):
-    frame_pattern = re.compile(r'frame (\d+)')
-    bbox_pattern = re.compile(r'\[(\d+\.\d+), (\d+\.\d+), (\d+\.\d+), (\d+\.\d+)\]')
+    pattern = re.compile(r'(\d+):\[(\d+),(\d+),(\d+),(\d+)\]')
+    matches = pattern.findall(output)
     
-    frame = frame_pattern.findall(output)
-    bbox = bbox_pattern.findall(output)
-    
-    frame = [int(f) for f in frame]
-    bbox = [[float(b) for b in box] for box in bbox]
-    
-    return list(zip(frame, bbox))
+    frame_to_bbox = {}
+    # Loop through matches to populate the dictionary
+    for match in matches:
+        frame_number = int(match[0])
+        bbox = [int(coord) for coord in match[1:]]
+        frame_to_bbox[frame_number] = bbox
+
+    return frame_to_bbox
 
 
 def write_log(log_path, video_id, task, query_id, answer, info=None):
@@ -116,43 +117,52 @@ def main():
     
     # this use the test dataset, which has the same format as the training dataset
     if args.task in ['iou']:
-        average_begin_frame_wrong = 0
-        average_end_frame_wrong = 0
-        average_begin_iou = 0
-        average_end_iou = 0
+
+        total_v_iou = 0
+        total_t_iou = 0
         for index, record in tqdm(enumerate(js), total=len(js)):
             id = record['id']
             query = record['conversations'][0]['value']
+            true_answer = record['conversations'][1]['value']
             feat_path = os.path.join(args.feat_folder, f"{id}.npy")
             if os.path.isfile(feat_path):
                 features = torch.from_numpy(np.load(feat_path)).cuda()
             answer = inference(model, features, query, tokenizer)
-            frame_and_bbox = extract_frame_and_position(answer)
-            begin_frame = frame_and_bbox[0][0]
-            begin_bbox = frame_and_bbox[0][1]
-            end_frame = frame_and_bbox[1][0]
-            end_bbox = frame_and_bbox[1][1]
             
-            begin_frame_correct = True
-            end_frame_correct = True
-            if begin_frame != record['meta']['token']['<s0>']:
-                begin_frame_correct = False
-                average_begin_frame_wrong += 1
-            if end_frame != record['meta']['token']['<e0>']:
-                end_frame_correct = False
-                average_end_frame_wrong += 1
-            begin_iou = iou_bbox(record['meta']['token']['<b0>'], begin_bbox)
-            end_iou = iou_bbox(record['meta']['token']['<b1>'], end_bbox)
-            average_begin_iou += begin_iou
-            average_end_iou += end_iou
-            write_log(args.log_path, id, 'iou', query, answer, info={"begin_frame_correct": begin_frame_correct, 
-                                                                     'end_frame_correct': end_frame_correct,
-                                                                     'begin_iou': begin_iou,
-                                                                     'end_iou': end_iou})
-        write_log(args.log_path, id, 'iou', query, answer, info={"average_begin_frame_correct": 1 - average_begin_frame_wrong / len(js), 
-                                                                'average_end_frame_correct': 1- average_end_frame_wrong / len(js),
-                                                                'average_begin_iou': average_begin_iou / len(js),
-                                                                'average_end_iou': average_end_iou / len(js)})
+            predict_frame_and_bbox = extract_frame_and_position(answer)
+            true_frame_and_bbox = extract_frame_and_position(true_answer)
+            
+            frames_union = set(predict_frame_and_bbox.keys()) | set(true_frame_and_bbox.keys())
+            frame_intersection = set(predict_frame_and_bbox.keys()) & set(true_frame_and_bbox.keys())
+            
+            v_iou = 0
+            for frame in frame_intersection:
+                predict_bbox = predict_frame_and_bbox[frame]
+                true_bbox = true_frame_and_bbox[frame]
+                iou = iou_bbox(true_bbox, predict_bbox)
+                v_iou += iou
+            
+            # video iou
+            v_iou = v_iou / len(frames_union)
+            total_v_iou += v_iou
+            
+            # temporal iou
+            t_iou = (max(frame_intersection) - min(frame_intersection)) / (max(frames_union) - min(frames_union))
+            total_t_iou += t_iou
+            
+            # spatial iou, using GT start and end frames
+            s_iou = iou_bbox(true_frame_and_bbox[min(true_frame_and_bbox.keys)], predict_frame_and_bbox[min(predict_frame_and_bbox.keys)])
+            
+            
+            m_v_iou = total_v_iou / (index + 1)
+            m_t_iou = total_t_iou / (index + 1)
+            
+            write_log(args.log_path, id, 'iou', query, answer, info={"v_iou": v_iou,
+                                                                     "t_iou": t_iou,
+                                                                    "m_v_iou": m_v_iou,
+                                                                    "m_t_iou": m_t_iou})
+        
+        # write_log(args.log_path, id, 'iou', query, answer, info={"": })
         return
             
     
