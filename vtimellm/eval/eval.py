@@ -151,7 +151,7 @@ def main():
             total_t_iou += t_iou
             
             # spatial iou, using GT start and end frames
-            s_iou = iou_bbox(true_frame_and_bbox[min(true_frame_and_bbox.keys)], predict_frame_and_bbox[min(predict_frame_and_bbox.keys)])
+            # s_iou = iou_bbox(next(iter(true_frame_and_bbox.values())), next(iter(predict_frame_and_bbox.values())))
             
             
             m_v_iou = total_v_iou / (index + 1)
