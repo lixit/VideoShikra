@@ -3,15 +3,23 @@ import copy
 import json
 import torch
 import transformers
+from transformers import CLIPImageProcessor, CLIPVisionModel
 from PIL import Image
 import numpy as np
 from torch.utils.data import Dataset
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Sequence, List
+import pathlib 
 
 from vtimellm.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN
 from vtimellm import conversation as conversation_lib
-from vtimellm.mm_utils import tokenizer_image_token
+from vtimellm.mm_utils import tokenizer_image_token, extract_frames
+
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+model = CLIPVisionModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
+processor = CLIPImageProcessor.from_pretrained("openai/clip-vit-large-patch14")
 
 @dataclass
 class DataArguments:
@@ -402,18 +410,38 @@ class LazySupervisedDataset(Dataset):
         #     for l in range(len(source['conversations'])):
         #         for x1, x2 in replace_set:
         #             source['conversations'][l]['value'] = source['conversations'][l]['value'].replace(x1, x2)
-        image = torch.zeros((100 if data_type == 'video' else 1, 768), dtype=torch.float16)
+        # image = torch.zeros((100 if data_type == 'video' else 1, 768), dtype=torch.float16)
+        
+        if data_type == 'video':
+            vid_path = pathlib.Path(self.feat_folder) / source["meta"]["vid_path"]
+            vid_path = vid_path.as_posix()
+            begin_fid = source["meta"]["begin_fid"]
+            end_fid = source["meta"]["end_fid"]
+            asked_frames = source["meta"]["asked_frames"]
+            # Nx3xHxW
+            images = extract_frames(vid_path, begin_fid, end_fid, asked_frames)
+        else:
+            image_path = '{}/{}'.format(self.feat_folder, source["image"])
+            images = Image.open(image_path)
+            
+        inputs = processor(images=images, return_tensors="pt")
 
+        with torch.no_grad():
+            outputs = model(**inputs, output_hidden_states=True)
 
-        try:
-            feature_path = '{}/{}.npy'.format(self.feat_folder, source['id'])
-            image = np.load(feature_path) # <N, 768> float16
-            image = torch.from_numpy(image)
-            if data_type == 'image' and len(image.shape) == 1: # <768>
-                image = image.unsqueeze(0) # torch.Size([1, 768])
-        except Exception as e:
-            print(e)
-            return random.choice(self)
+        select_hidden_state = outputs.hidden_states[-2]
+        image_features = select_hidden_state[:, 1:]
+            
+
+        # try:
+        #     feature_path = '{}/{}.npy'.format(self.feat_folder, source['id'])
+        #     image = np.load(feature_path) # <N, 768> float16
+        #     image = torch.from_numpy(image)
+        #     if data_type == 'image' and len(image.shape) == 1: # <768>
+        #         image = image.unsqueeze(0) # torch.Size([1, 768])
+        # except Exception as e:
+        #     print(e)
+        #     return random.choice(self)
 
         if getattr(self.tokenizer, 'name', None) == 'GLMTokenizer':
             data_dict = preprocess_glm([source["conversations"]], self.tokenizer)
@@ -426,7 +454,7 @@ class LazySupervisedDataset(Dataset):
             data_dict = dict(input_ids=data_dict["input_ids"][0],
                              labels=data_dict["labels"][0])
 
-        data_dict['image'] = image
+        data_dict['image'] = image_features
         return data_dict
 
 

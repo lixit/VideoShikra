@@ -105,6 +105,7 @@ class VideoExtractor():
             start = 0
             end = total_frames - 1
 
+            # split is to specify the start and end seconds
             split = data.get('split', None)
             if split is not None:
                 fps = video_reader.get_avg_fps()
@@ -118,3 +119,19 @@ class VideoExtractor():
         
         images = torch.from_numpy(sampled_frames.transpose((0, 3, 1, 2)))
         return id, images
+
+def extract_frames(video_path, start_frame, end_frame, N):
+    
+    video_reader = decord.VideoReader(video_path)
+    total_frames = len(video_reader)
+
+    start = max(start_frame, 0)
+    end = min(end_frame, total_frames - 1)
+    
+    sampled_indices = np.linspace(start, end, N, dtype=np.int32)
+    # NxHxWx3, where N is the length of `indices`.
+    # example: 100, 480, 640, 3
+    sampled_frames = video_reader.get_batch(sampled_indices).asnumpy()
+
+    images = torch.from_numpy(sampled_frames)
+    return images
