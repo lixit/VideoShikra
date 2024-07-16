@@ -17,6 +17,7 @@ from vtimellm.mm_utils import tokenizer_image_token, extract_frames
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+# device = torch.device("cpu")
 
 model = CLIPVisionModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
 processor = CLIPImageProcessor.from_pretrained("openai/clip-vit-large-patch14")
@@ -425,6 +426,8 @@ class LazySupervisedDataset(Dataset):
             images = Image.open(image_path)
             
         inputs = processor(images=images, return_tensors="pt")
+        # Move inputs to the defined device
+        inputs = {k: v.to(device) for k, v in inputs.items()}
 
         with torch.no_grad():
             outputs = model(**inputs, output_hidden_states=True)

@@ -11,6 +11,7 @@ deepspeed --include localhost:$gpu_vis --master_port $MASTER_PORT vtimellm/train
     --model_name_or_path lmsys/vicuna-7b-v1.5 \
     --version plain \
     --data_path ./data/blip_laion_cc_sbu_558k.json \
+    --dataloader_pin_memory False \
     --feat_folder ../LLaVA-Pretrain/images_f \
     --tune_mm_mlp_adapter True \
     --output_dir ./checkpoints/vtimellm-$MODEL_VERSION-stage1_xl \
