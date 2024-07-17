@@ -54,7 +54,7 @@ class VTimeLLMMetaForCausalLM(ABC):
             image_features = torch.split(image_features, split_sizes, dim=0)
             # image_features = [x.flatten(0, 1) for x in image_features]
         else: # before: Batch, N, 256, 1024, for video: 1, 100, 256, 1024
-            image_features = self.get_model().mm_projector(images) # Batch, N, 256, 1024
+            image_features = self.get_model().mm_projector(images) # Batch, N, 256, 256
             n_frames = image_features.size(1)
             image_features = image_features.view(-1, n_frames, 16, 4096) # Batch, N, 16, 4096
         # print([image.shape for image in image_features])

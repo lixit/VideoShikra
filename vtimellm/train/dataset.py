@@ -10,6 +10,7 @@ from torch.utils.data import Dataset
 from dataclasses import dataclass, field
 from typing import Dict, Optional, Sequence, List
 import pathlib 
+import re
 
 from vtimellm.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TOKEN
 from vtimellm import conversation as conversation_lib
@@ -311,7 +312,7 @@ def preprocess_plain(
     for source in sources:
         assert len(source) == 2
         assert DEFAULT_IMAGE_TOKEN in source[0]['value']
-        source[0]['value'] = DEFAULT_IMAGE_TOKEN + '\n'
+        source[0]['value'] = DEFAULT_IMAGE_TOKEN + '\n' # completely remove the question
         conversation = source[0]['value'] + source[1]['value'] + conversation_lib.default_conversation.sep
         conversations.append(conversation)
     # tokenize conversations
@@ -369,6 +370,59 @@ def preprocess(
 
     return dict(input_ids=input_ids, labels=targets)
 
+# example = {"img_path": "COCO_train2014_000000310289.jpg", "expression": "the giant doughnut with white icing and red , white , and blue sprinkles", "bbox": [334.72, 298.08, 522.88, 450.23999999999995], "dataset_name": "refcocog", "height": 480, "width": 640}
+
+# example_return =  {
+#     "conversations": [
+#       {
+#         "from": "human",
+#         "value": "Write a terse but informative summary of the picture.\n<image>"
+#       },
+#       {
+#         "from": "gpt",
+#         "value": "a grey watch with an army style strap"
+#       }
+#     ]
+# }
+
+def normalize_bbox(bbox, width, height):
+    """
+    Normalize the bbox
+    """
+    xmin, ymin, xmax, ymax = bbox
+    xmin = int(round(xmin / width, 2) * 100)
+    ymin = int(round(ymin / height, 2) * 100)
+    xmax = int(round(xmax / width, 2) * 100)
+    ymax = int(round(ymax / height, 2) * 100)
+    bbox = [xmin, ymin, xmax, ymax]
+    return re.sub(r'\s+', '', str(bbox))
+
+def get_conversation(example: dict, template: list):
+    example_return = {
+        "image": "00223/002239345.jpg",
+        "conversations": [
+        {
+            "from": "human",
+            "value": "Write a terse but informative summary of the picture.\n<image>"
+        },
+        {
+            "from": "gpt",
+            "value": ""
+        }
+        ]
+    }
+    # generate question
+    expression = example["expression"]
+    tmp = random.choice(template)
+    question = tmp.replace("<expr>", expression)
+    
+    # generate answer
+    answer = normalize_bbox(example["bbox"], example["width"], example["height"])
+    
+    example_return["image"] = example["img_path"]
+    example_return["conversations"][0]["value"] = question
+    example_return["conversations"][1]["value"] = answer
+    return example_return
 
 
 class LazySupervisedDataset(Dataset):
@@ -376,18 +430,31 @@ class LazySupervisedDataset(Dataset):
 
     def __init__(self, data_path: str,
                  feat_folder: str,
-                 tokenizer: transformers.PreTrainedTokenizer):
+                 tokenizer: transformers.PreTrainedTokenizer,
+                 template_path: str = "config/_base_/dataset/template/REC.json"):
         super(LazySupervisedDataset, self).__init__()
 
         self.tokenizer = tokenizer
-        self.list_data_dict = json.load(open(data_path, "r"))
+        if data_path.endswith('.jsonl'):
+            self.list_data_dict = list(open(data_path, "r"))
+            self.is_jsonl = True
+        else:
+            self.list_data_dict = json.load(open(data_path, "r"))
+            self.is_jsonl = False
+            
         self.feat_folder = feat_folder
+        self.templates = json.load(open(template_path, 'r', encoding='utf8'))
 
     def __len__(self):
         return len(self.list_data_dict)
 
     def __getitem__(self, i) -> Dict[str, torch.Tensor]:
-        source = copy.deepcopy(self.list_data_dict[i])
+        # convert to vtimellm style
+        if self.is_jsonl:
+            orginal_source = json.loads(self.list_data_dict[i])
+            source = copy.deepcopy(get_conversation(orginal_source, self.templates))
+        else:
+            source = copy.deepcopy(self.list_data_dict[i])
 
         data_type = 'video'
         if '<image>' in source['conversations'][0]['value']:
