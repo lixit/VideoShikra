@@ -16,6 +16,8 @@ from vtimellm.constants import IGNORE_INDEX, IMAGE_TOKEN_INDEX, DEFAULT_IMAGE_TO
 from vtimellm import conversation as conversation_lib
 from vtimellm.mm_utils import tokenizer_image_token, extract_frames
 
+import multiprocessing as mp
+mp.set_start_method('spawn', force=True)
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # device = torch.device("cpu")
@@ -491,17 +493,16 @@ class LazySupervisedDataset(Dataset):
         else:
             image_path = '{}/{}'.format(self.feat_folder, source["image"])
             images = Image.open(image_path)
-            
+
         inputs = processor(images=images, return_tensors="pt")
         # Move inputs to the defined device
         inputs = {k: v.to(device) for k, v in inputs.items()}
-
+        
         with torch.no_grad():
             outputs = model(**inputs, output_hidden_states=True)
 
         select_hidden_state = outputs.hidden_states[-2]
         image_features = select_hidden_state[:, 1:]
-            
 
         # try:
         #     feature_path = '{}/{}.npy'.format(self.feat_folder, source['id'])
