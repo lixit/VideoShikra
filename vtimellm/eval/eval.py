@@ -128,7 +128,6 @@ def main():
             if os.path.isfile(feat_path):
                 features = torch.from_numpy(np.load(feat_path)).cuda()
             answer = inference(model, features, query, tokenizer)
-            
             predict_frame_and_bbox = extract_frame_and_position(answer)
             true_frame_and_bbox = extract_frame_and_position(true_answer)
             
@@ -147,7 +146,10 @@ def main():
             total_v_iou += v_iou
             
             # temporal iou
-            t_iou = (max(frame_intersection) - min(frame_intersection)) / (max(frames_union) - min(frames_union))
+            if len(frame_intersection) == 0:
+                t_iou = 0
+            else:
+                t_iou = (max(frame_intersection) - min(frame_intersection)) / (max(frames_union) - min(frames_union))
             total_t_iou += t_iou
             
             # spatial iou, using GT start and end frames
