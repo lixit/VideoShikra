@@ -12,7 +12,7 @@ deepspeed --include localhost:$gpu_vis --master_port $MASTER_PORT vtimellm/train
     --version v1 \
     --data_path ./data/shikra_data/REC_ref3_train.jsonl \
     --dataloader_pin_memory False \
-    --feat_folder /home/a/datasets/train2014 \
+    --feat_folder /home/xitong/train2014 \
     --tune_mm_mlp_adapter True \
     --pretrain_mm_mlp_adapter ./checkpoints/vtimellm-$MODEL_VERSION-stage1_xl/mm_projector.bin \
     --output_dir ./checkpoints/vtimellm-$MODEL_VERSION-stage1_xl \

@@ -4,24 +4,26 @@ MODEL_VERSION=vicuna-v1-5-7b
 gpu_vis=0 # per_device_train_batch_size * gradient_accumulation_steps * n_gpus = 128
 MASTER_PORT=29570
 
+cd ..
 
 deepspeed --include localhost:$gpu_vis --master_port $MASTER_PORT vtimellm/train/train_mem.py \
     --deepspeed ./scripts/zero3.json \
     --lora_enable True \
-    --model_name_or_path ./checkpoints/vicuna-7b-v1.5 \
+    --model_name_or_path lmsys/vicuna-7b-v1.5 \
+    --dataloader_pin_memory False \
     --version v1 \
-    --data_path ./data/stage2.json \
-    --feat_folder /path/to/stage2_feat \
-    --pretrain_mm_mlp_adapter ./checkpoints/vtimellm-$MODEL_VERSION-stage1/mm_projector.bin \
-    --output_dir ./checkpoints/vtimellm-$MODEL_VERSION-stage2 \
+    --data_path ./data/xl/vidstg_train.json \
+    --feat_folder /home/xitong  \
+    --pretrain_mm_mlp_adapter checkpoints/vtimellm-vicuna-v1-5-7b-stage1_xl/checkpoint-2247/mm_projector.bin \
+    --output_dir ./checkpoints/vtimellm-$MODEL_VERSION-stage2_xl \
     --bf16 True \
     --num_train_epochs 2 \
-    --per_device_train_batch_size 8 \
+    --per_device_train_batch_size 4 \
     --gradient_accumulation_steps 16 \
     --evaluation_strategy "no" \
     --save_strategy "steps" \
-    --save_steps 50000 \
-    --save_total_limit 1 \
+    --save_steps 200 \
+    --save_total_limit 3 \
     --learning_rate 1e-4 \
     --freeze_mm_mlp_adapter True \
     --lora_r 64 \
