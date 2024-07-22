@@ -42,12 +42,12 @@ def load_pretrained_model(args, stage2=None, stage3=None):
     # load stage1:
     model.get_model().initialize_vision_modules(args)
 
-    if stage2 is not None:
+    if stage2:
         print('Loading stage2 weights...')
         model = load_lora(model, stage2)
         print('Merging stage2 weights...')
         model = model.merge_and_unload()
-        if stage3 is not None:
+        if stage3:
             print('Loading stage3 weights...')
             model = load_lora(model, stage3)
             print('Merging stage3 weights...')
