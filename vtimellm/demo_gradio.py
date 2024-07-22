@@ -28,8 +28,8 @@ try:
 except ImportError:
     from PIL import Image
     BICUBIC = Image.BICUBIC
-from torchvision.transforms import Compose, Resize, CenterCrop, Normalize
-import clip
+from vtimellm.mm_utils import tokenizer_image_token, extract_frames
+from transformers import CLIPImageProcessor, CLIPVisionModel
 
 def parse_args():
     parser = argparse.ArgumentParser()
@@ -54,15 +54,8 @@ disable_torch_init()
 tokenizer, model, context_len = load_pretrained_model(args, args.stage2, args.stage3)
 model = model.to(torch.float16).to(device)
 
-clip_model, _ = clip.load(args.clip_path)
-clip_model.eval()
-clip_model = clip_model.to(device)
-
-transform = Compose([
-    Resize(224, interpolation=BICUBIC),
-    CenterCrop(224),
-    Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
-])
+clip_model = CLIPVisionModel.from_pretrained("openai/clip-vit-large-patch14").to(device)
+clip_processor = CLIPImageProcessor.from_pretrained("openai/clip-vit-large-patch14")
 
 print('Initialization Finished')
 
@@ -84,20 +77,20 @@ def upload_video(gr_video, chat_state, video_features_state, conv_state, chatbot
         return None, None, gr.update(interactive=True), chat_state, video_features_state, conv_state, None
     else:
         print(gr_video)
-        video_loader = VideoExtractor(N=100)
-        _, images = video_loader.extract({'id': None, 'video': gr_video})
+        # video_loader = VideoExtractor(N=100)
+        # _, images = video_loader.extract({'id': None, 'video': gr_video})
+        images = extract_frames(gr_video, 0, 0, 100)
 
-        transform = Compose([
-            Resize(224, interpolation=BICUBIC),
-            CenterCrop(224),
-            Normalize((0.48145466, 0.4578275, 0.40821073), (0.26862954, 0.26130258, 0.27577711)),
-        ])
-
-        # print(images.shape) # <N, 3, H, W>
-        images = transform(images / 255.0)
-        images = images.to(torch.float16)
+        inputs = clip_processor(images=images, return_tensors="pt")
+        # Move inputs to the defined device
+        inputs = {k: v.to(device) for k, v in inputs.items()}
+        
         with torch.no_grad():
-            video_features_state = clip_model.encode_image(images.to(device))
+            outputs = clip_model(**inputs, output_hidden_states=True)
+
+        select_hidden_state = outputs.hidden_states[-2]
+        video_features_state = select_hidden_state[:, 1:]
+        video_features_state = video_features_state.to(torch.float16)
 
         chatbot = chatbot + [((gr_video,), None)]
         chat_state = conv_templates["v1"].copy()

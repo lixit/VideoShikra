@@ -126,7 +126,10 @@ def extract_frames(video_path, start_frame, end_frame, N):
     total_frames = len(video_reader)
 
     start = max(start_frame, 0)
-    end = min(end_frame, total_frames - 1)
+    if end_frame < N:
+        end = end_frame - 1
+    else:
+        end = min(end_frame, total_frames - 1)
     
     sampled_indices = np.linspace(start, end, N, dtype=np.int32)
     # NxHxWx3, where N is the length of `indices`.
